@@ -12,6 +12,7 @@
 
 # www
 dist/
+node_modules/
 
 # misc
 .env
