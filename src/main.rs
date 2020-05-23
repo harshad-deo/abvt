@@ -9,7 +9,11 @@ async fn main() {
     pretty_env_logger::init();
     info!("Initializing ABVT");
 
-    let hello = warp::path!("hello" / String).map(|name| format!("Hello {}!", name));
+    let index = warp::fs::dir("www/dist");
+    // just a simple health check
+    let health = warp::path!("health").map(|| "Ok");
 
-    warp::serve(hello).run(([0, 0, 0, 0], 8080)).await;
+    let routes = index.or(health);
+
+    warp::serve(routes).run(([0, 0, 0, 0], 8080)).await;
 }
