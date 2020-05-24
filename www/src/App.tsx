@@ -3,7 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import CssBaseline from '@material-ui/core/CssBaseline';
 import {makeStyles, AppBar, Toolbar, Typography} from '@material-ui/core';
-import Universe from './components/Universe';
+import AgentRenderer from './components/AgentRenderer';
 import log from 'loglevel';
 
 declare const DEVELOPMENT_BUILD: boolean;
@@ -37,7 +37,7 @@ const App: React.FC<{}> = () => {
             </Typography>
           </Toolbar>
         </AppBar>
-        <Universe />
+        <AgentRenderer />
       </div>
     </>
   );
