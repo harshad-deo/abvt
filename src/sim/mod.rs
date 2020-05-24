@@ -17,7 +17,20 @@ pub async fn new(websocket: WebSocket, agent_count: u32, scale_x: u8, scale_y: u
   let mask_x = dim_x - 1;
   let mask_y = dim_y - 1;
 
-  let (ws_ts, mut ws_rx) = websocket.split();
+  let (mut ws_tx, _) = websocket.split();
+  let time_step = Duration::from_millis(30);
 
-  time::delay_for(Duration::from_millis(5000)).await;
+  let mut idx = 0;
+
+  loop {
+    let msg = Message::text(format!("{}", idx));
+    if let Err(_) = ws_tx.send(msg).await {
+      info!("Socket connection closed. Terminating simulation");
+      break;
+    }
+    idx += 1;
+    time::delay_for(time_step).await;
+  }
+
+  info!("Terminated simulation");
 }

@@ -1,6 +1,7 @@
 import React from 'react';
 import {makeStyles} from '@material-ui/core';
 import log from 'loglevel';
+import BufferedQueue from '../utils/bufferedQueue';
 
 const vertexShaderSource = `#version 300 es
 in vec2 a_position;
@@ -144,7 +145,11 @@ const useStyles = makeStyles({
 const WIDTH = 1000;
 const HEIGHT = 800;
 
-const AgentRenderer: React.FC<{}> = () => {
+interface AgentRendererProps {
+  queue: BufferedQueue<string | null>;
+}
+
+const AgentRenderer: React.FC<AgentRendererProps> = ({queue}: AgentRendererProps) => {
   const styles = useStyles();
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
@@ -210,6 +215,18 @@ const AgentRenderer: React.FC<{}> = () => {
     resizeCanvas(canvas, ctx, resolutionUniformLocation);
     ctx.viewport(0, 0, ctx.canvas.width, ctx.canvas.height); // setup call necessary
     ctx.uniform2f(resolutionUniformLocation, ctx.canvas.width, ctx.canvas.height); // setup call necessary
+
+    async function messageProcessor() {
+      log.info('initiating message processor');
+      for await (const msg of queue) {
+        if (!msg) {
+          log.info('terminating message processor');
+          return;
+        }
+        log.info(`received ${msg}`);
+      }
+    }
+    messageProcessor();
 
     const widthStep = 0.01 * WIDTH;
     const heightStep = 0.01 * HEIGHT;

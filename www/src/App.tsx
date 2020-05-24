@@ -5,10 +5,13 @@ import CssBaseline from '@material-ui/core/CssBaseline';
 import AgentRenderer from './components/AgentRenderer';
 import log from 'loglevel';
 import TitleBar from './components/TitleBar';
+import BufferedQueue from './utils/bufferedQueue';
 
 declare const DEVELOPMENT_BUILD: boolean;
 
 declare const WEBSOCKET_URL: string;
+
+const QUEUE_SIZE = 8;
 
 if (DEVELOPMENT_BUILD) {
   log.setLevel(log.levels.INFO, true);
@@ -26,17 +29,22 @@ class AppState {
 
   readonly socket: WebSocket | null;
 
-  private constructor(socketState: SocketState, socket: WebSocket | null) {
+  readonly queue: BufferedQueue<string | null> | null;
+
+  private constructor(socketState: SocketState, socket: WebSocket | null, queue: BufferedQueue<string | null> | null) {
     this.socketState = socketState;
     this.socket = socket;
+    this.queue = queue;
   }
 
-  static readonly pending: AppState = new AppState(SocketState.Pending, null);
+  static readonly pending: AppState = new AppState(SocketState.Pending, null, null);
 
-  static readonly closed: AppState = new AppState(SocketState.Closed, null);
+  static readonly closed: AppState = new AppState(SocketState.Closed, null, null);
 
   static initialized(socket: WebSocket) {
-    return new AppState(SocketState.Initialized, socket);
+    const queue = new BufferedQueue<string | null>(QUEUE_SIZE);
+    socket.onmessage = (ev: MessageEvent) => queue.push(ev.data);
+    return new AppState(SocketState.Initialized, socket, queue);
   }
 }
 
@@ -60,10 +68,18 @@ const App: React.FC<{}> = () => {
 
     return () => {
       if (state.socketState === SocketState.Initialized) {
-        const {socket} = state;
+        const {socket, queue} = state;
+        if (queue) {
+          queue.push(null);
+          queue.terminate();
+        }
         if (!socket) {
           return;
         }
+        socket.onopen = null;
+        socket.onmessage = null;
+        socket.onerror = null;
+        socket.onclose = null;
         if (socket.readyState === WebSocket.CLOSING || socket.readyState === WebSocket.CLOSED) {
           // already closed;
           return;
@@ -78,7 +94,11 @@ const App: React.FC<{}> = () => {
     return <div>Initializing</div>;
   }
   if (state.socketState === SocketState.Initialized) {
-    return <AgentRenderer />;
+    const {queue} = state;
+    if (!queue) {
+      return <div>Invariant Failure</div>;
+    }
+    return <AgentRenderer queue={queue} />;
   }
   return <div>Closed</div>;
 };
