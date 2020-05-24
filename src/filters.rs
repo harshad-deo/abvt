@@ -16,12 +16,13 @@ fn health_filter() -> impl Filter<Extract = impl Reply, Error = Rejection> + Clo
   warp::path("health").and(warp::path::end()).map(|| "Ok")
 }
 
-const AGENT_COUNT: u32 = 1000;
+const AGENT_COUNT: u32 = 1024;
+const SIM_SIZE: u16 = 1024;
 const SCALE_X: u8 = 8;
 const SCALE_Y: u8 = 8;
 
 fn ws_filter() -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
-  warp::path("ws")
-    .and(warp::ws())
-    .map(move |ws: warp::ws::Ws| ws.on_upgrade(move |websocket| sim::new(websocket, AGENT_COUNT, SCALE_X, SCALE_Y)))
+  warp::path("ws").and(warp::ws()).map(move |ws: warp::ws::Ws| {
+    ws.on_upgrade(move |websocket| sim::new(websocket, AGENT_COUNT, SIM_SIZE, SCALE_X, SCALE_Y))
+  })
 }

@@ -29,9 +29,13 @@ class AppState {
 
   readonly socket: WebSocket | null;
 
-  readonly queue: BufferedQueue<string | null> | null;
+  readonly queue: BufferedQueue<Uint8Array | null> | null;
 
-  private constructor(socketState: SocketState, socket: WebSocket | null, queue: BufferedQueue<string | null> | null) {
+  private constructor(
+    socketState: SocketState,
+    socket: WebSocket | null,
+    queue: BufferedQueue<Uint8Array | null> | null,
+  ) {
     this.socketState = socketState;
     this.socket = socket;
     this.queue = queue;
@@ -42,8 +46,8 @@ class AppState {
   static readonly closed: AppState = new AppState(SocketState.Closed, null, null);
 
   static initialized(socket: WebSocket) {
-    const queue = new BufferedQueue<string | null>(QUEUE_SIZE);
-    socket.onmessage = (ev: MessageEvent) => queue.push(ev.data);
+    const queue = new BufferedQueue<Uint8Array | null>(QUEUE_SIZE);
+    socket.onmessage = (ev: MessageEvent) => queue.push(new Uint8Array(ev.data));
     return new AppState(SocketState.Initialized, socket, queue);
   }
 }
@@ -55,6 +59,7 @@ const App: React.FC<{}> = () => {
     if (state.socketState === SocketState.Pending) {
       log.info('creating websocket');
       const socket = new WebSocket(WEBSOCKET_URL);
+      socket.binaryType = 'arraybuffer';
       socket.onopen = (_: Event) => setState(AppState.initialized(socket));
       socket.onclose = (_: Event) => {
         log.info('socket closed by server');

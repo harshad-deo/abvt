@@ -2,18 +2,18 @@ import React from 'react';
 import {makeStyles} from '@material-ui/core';
 import log from 'loglevel';
 import BufferedQueue from '../utils/bufferedQueue';
+import {abvt} from '../msg/simstep_generated';
+
+const {flatbuffers} = require('flatbuffers');
 
 const vertexShaderSource = `#version 300 es
 in vec2 a_position;
 in float a_color;
 
-uniform vec2 u_resolution;
-
 out float v_color;
 
 void main(){
-  vec2 zeroToOne = a_position / u_resolution;
-  vec2 zeroToTwo = zeroToOne * 2.0;
+  vec2 zeroToTwo = a_position * 2.0;
   vec2 clipSpace = zeroToTwo - 1.0;
   gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
   gl_PointSize = 5.0;
@@ -89,11 +89,7 @@ function createProgram(
   return null;
 }
 
-function resizeCanvas(
-  canvas: HTMLCanvasElement,
-  ctx: WebGL2RenderingContext,
-  resolutionUniformLocation: WebGLUniformLocation,
-) {
+function resizeCanvas(canvas: HTMLCanvasElement, ctx: WebGL2RenderingContext) {
   const cssToRealPixels = window.devicePixelRatio || 1;
 
   const displayWidth = Math.floor(canvas.clientWidth * cssToRealPixels);
@@ -103,7 +99,6 @@ function resizeCanvas(
     canvas.width = displayWidth;
     canvas.height = displayHeight;
     ctx.viewport(0, 0, displayWidth, displayWidth);
-    ctx.uniform2f(resolutionUniformLocation, displayWidth, displayHeight);
   }
 }
 
@@ -116,7 +111,6 @@ function drawAgents(
   colorLocation: number,
   colors: Float32Array,
 ) {
-  // const start = performance.now();
   ctx.bindBuffer(ctx.ARRAY_BUFFER, positionBuffer);
   ctx.bufferData(ctx.ARRAY_BUFFER, positions, ctx.STATIC_DRAW);
   ctx.enableVertexAttribArray(positionLocation);
@@ -127,13 +121,49 @@ function drawAgents(
   ctx.enableVertexAttribArray(colorLocation);
   ctx.vertexAttribPointer(colorLocation, 1, ctx.FLOAT, false, 0, 0);
 
-  ctx.drawArrays(ctx.POINTS, 0, colors.length);
-  // const end = performance.now();
-  // log.info(`frame drawn in ${end - start}ms`);
+  requestAnimationFrame((_) => ctx.drawArrays(ctx.POINTS, 0, colors.length));
 }
 
-function randomInt(range: number): number {
-  return Math.floor(range * Math.random());
+async function messageProcessor(
+  gl: WebGL2RenderingContext,
+  queue: BufferedQueue<Uint8Array | null>,
+  positionBuffer: WebGLBuffer,
+  positionAttributeLocation: number,
+  colorBuffer: WebGLBuffer,
+  colorAttributeLocation: number,
+) {
+  log.info('initiating message processor');
+  for await (const packet of queue) {
+    if (!packet) {
+      log.info('terminating message processor');
+      return;
+    }
+    const buf = new flatbuffers.ByteBuffer(packet);
+    const msg = abvt.SimStep.getRootAsSimStep(buf);
+
+    log.info(`drawing step ${msg.idx().toFloat64()}`);
+    const positionsArray = msg.positionsArray();
+    const scoreArray = msg.scoreArray();
+
+    if (!positionsArray) {
+      log.error('undefined positions');
+      continue;
+    }
+    if (!scoreArray) {
+      log.error('undefined scores');
+      continue;
+    }
+
+    drawAgents(
+      gl,
+      positionBuffer,
+      positionAttributeLocation,
+      positionsArray,
+      colorBuffer,
+      colorAttributeLocation,
+      scoreArray,
+    );
+  }
 }
 
 const useStyles = makeStyles({
@@ -146,7 +176,7 @@ const WIDTH = 1000;
 const HEIGHT = 800;
 
 interface AgentRendererProps {
-  queue: BufferedQueue<string | null>;
+  queue: BufferedQueue<Uint8Array | null>;
 }
 
 const AgentRenderer: React.FC<AgentRendererProps> = ({queue}: AgentRendererProps) => {
@@ -187,11 +217,6 @@ const AgentRenderer: React.FC<AgentRendererProps> = ({queue}: AgentRendererProps
       log.error('color buffer not bound');
       return;
     }
-    const resolutionUniformLocation = ctx.getUniformLocation(program, 'u_resolution');
-    if (!resolutionUniformLocation) {
-      log.error('resolution uniform not bound');
-      return;
-    }
 
     const positionAttributeLocation = ctx.getAttribLocation(program, 'a_position');
     const colorAttributeLocation = ctx.getAttribLocation(program, 'a_color');
@@ -199,79 +224,13 @@ const AgentRenderer: React.FC<AgentRendererProps> = ({queue}: AgentRendererProps
     const vao = ctx.createVertexArray();
     ctx.bindVertexArray(vao);
 
-    const numPoints = 10000;
-
-    const positionArray = new Float32Array(numPoints * 2);
-    const colorArray = new Float32Array(numPoints);
-    for (let i = 0; i < numPoints; i++) {
-      positionArray[i * 2] = WIDTH * 0.1 + randomInt(WIDTH * 0.8);
-      positionArray[i * 2 + 1] = HEIGHT * 0.1 + randomInt(HEIGHT * 0.8);
-      colorArray[i] = Math.random();
-    }
-
     ctx.clearColor(0, 0, 0, 0);
     ctx.clear(ctx.COLOR_BUFFER_BIT | ctx.DEPTH_BUFFER_BIT);
     ctx.useProgram(program);
-    resizeCanvas(canvas, ctx, resolutionUniformLocation);
+    resizeCanvas(canvas, ctx);
     ctx.viewport(0, 0, ctx.canvas.width, ctx.canvas.height); // setup call necessary
-    ctx.uniform2f(resolutionUniformLocation, ctx.canvas.width, ctx.canvas.height); // setup call necessary
 
-    async function messageProcessor() {
-      log.info('initiating message processor');
-      for await (const msg of queue) {
-        if (!msg) {
-          log.info('terminating message processor');
-          return;
-        }
-        log.info(`received ${msg}`);
-      }
-    }
-    messageProcessor();
-
-    const widthStep = 0.01 * WIDTH;
-    const heightStep = 0.01 * HEIGHT;
-
-    const animationLoop = () => {
-      drawAgents(
-        ctx,
-        positionBuffer,
-        positionAttributeLocation,
-        positionArray,
-        colorBuffer,
-        colorAttributeLocation,
-        colorArray,
-      );
-
-      for (let i = 0; i < numPoints; i++) {
-        let driftX = i % 5;
-        if (i > numPoints / 2) {
-          driftX *= 1;
-        }
-
-        let driftY = i % 4;
-        if (i > numPoints / 2) {
-          driftY *= 1;
-        }
-
-        let newX = positionArray[i * 2] + (Math.random() - 0.5) * widthStep + driftX;
-        if (newX < 0) {
-          newX += WIDTH;
-        } else if (newX > WIDTH) {
-          newX -= WIDTH;
-        }
-        positionArray[i * 2] = newX;
-
-        let newY = positionArray[i * 2 + 1] + (Math.random() - 0.5) * heightStep + driftY;
-        if (newY < 0) {
-          newY += HEIGHT;
-        } else if (newY > HEIGHT) {
-          newY -= HEIGHT;
-        }
-        positionArray[i * 2 + 1] = newY;
-      }
-    };
-
-    setInterval(animationLoop, 30);
+    messageProcessor(ctx, queue, positionBuffer, positionAttributeLocation, colorBuffer, colorAttributeLocation);
   });
 
   return <canvas className={styles.canvas} width={`${WIDTH}px`} height={`${HEIGHT}px`} ref={canvasRef}></canvas>;
