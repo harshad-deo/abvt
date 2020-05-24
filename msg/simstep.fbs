@@ -1,0 +1,9 @@
+namespace abvt;
+
+table SimStep{
+  idx: uint64; // step index
+  positions: [float32]; // agent positions
+  score: [float32]; // risk scores
+}
+
+root_type SimStep;

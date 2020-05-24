@@ -4,6 +4,7 @@
 name = "abvt"
 version = "0.1.0"
 dependencies = [
+ "flatbuffers",
  "log 0.4.8",
  "pretty_env_logger",
  "tokio",
@@ -157,6 +158,15 @@ name = "fake-simd"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
+
+[[package]]
+name = "flatbuffers"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a788f068dd10687940565bf4b5480ee943176cbd114b12e811074bcf7c04e4b9"
+dependencies = [
+ "smallvec",
+]
 
 [[package]]
 name = "fnv"
