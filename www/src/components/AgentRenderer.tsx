@@ -115,7 +115,7 @@ function drawAgents(
   colorLocation: number,
   colors: Float32Array,
 ) {
-  const start = performance.now();
+  // const start = performance.now();
   ctx.bindBuffer(ctx.ARRAY_BUFFER, positionBuffer);
   ctx.bufferData(ctx.ARRAY_BUFFER, positions, ctx.STATIC_DRAW);
   ctx.enableVertexAttribArray(positionLocation);
@@ -127,8 +127,8 @@ function drawAgents(
   ctx.vertexAttribPointer(colorLocation, 1, ctx.FLOAT, false, 0, 0);
 
   ctx.drawArrays(ctx.POINTS, 0, colors.length);
-  const end = performance.now();
-  log.info(`frame drawn in ${end - start}ms`);
+  // const end = performance.now();
+  // log.info(`frame drawn in ${end - start}ms`);
 }
 
 function randomInt(range: number): number {
@@ -254,7 +254,7 @@ const AgentRenderer: React.FC<{}> = () => {
       }
     };
 
-    setInterval(animationLoop, 20);
+    setInterval(animationLoop, 30);
   });
 
   return <canvas className={styles.canvas} width={`${WIDTH}px`} height={`${HEIGHT}px`} ref={canvasRef}></canvas>;

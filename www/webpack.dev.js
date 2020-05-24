@@ -8,6 +8,7 @@ module.exports = merge(common, {
   plugins: [
     new webpack.DefinePlugin({
       DEVELOPMENT_BUILD: true,
+      WEBSOCKET_URL: JSON.stringify('ws://localhost:8080/ws'),
     }),
   ],
 });

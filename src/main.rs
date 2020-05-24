@@ -6,9 +6,9 @@ use abvt::filters;
 
 #[tokio::main]
 async fn main() {
-    pretty_env_logger::init();
-    info!("Initializing ABVT");
+  pretty_env_logger::init();
+  info!("Initializing ABVT");
 
-    let routes = filters::all_filters();
-    warp::serve(routes).run(([0, 0, 0, 0], 8080)).await;
+  let routes = filters::all_filters();
+  warp::serve(routes).run(([0, 0, 0, 0], 8080)).await;
 }
